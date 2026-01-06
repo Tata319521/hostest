@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宿命回响 · 职业人格测试</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="noise-overlay"></div>
+        <div class="border-frame"></div>
+
+        <section id="start-screen" class="screen active">
+            <h1 class="main-title">潜意识的回响</h1>
+            <p class="subtitle">在迷雾散去之前，看清你的灵魂。</p>
+            <button class="btn start-btn" onclick="startTest()">开始侧写</button>
+        </section>
+
+        <section id="quiz-screen" class="screen">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+            <div class="question-box">
+                <h2 id="question-text" class="fade-in">问题加载中...</h2>
+            </div>
+            <div class="options-box" id="options-container">
+                </div>
+        </section>
+
+        <section id="result-screen" class="screen">
+            <div class="result-card">
+                <div class="result-header">你的灵魂代号</div>
+                <h2 id="result-title">Title</h2>
+                <div class="divider"></div>
+                <div class="result-role" id="result-role">Role Description</div>
+                <p id="result-desc">Description text goes here.</p>
+                <button class="btn restart-btn" onclick="restartTest()">再次探寻</button>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // --- 数据配置 ---
+        // 对应流程图的节点逻辑
+        const questions = {
+            q1: { text: "你喜欢自由度高一点的职业吗？", yes: "q2", no: "q3" },
+            
+            // 分支一：喜欢自由 (q1-Yes)
+            q2: { text: "你是个热心肠、乐于助人的人吗？", yes: "q4", no: "q5" },
+            q4: { text: "你总是想要扮演拯救者的身份吗？", yes: "h01", no: "q8" },
+            q8: { text: "你喜欢兄长类 NPC 吗？", yes: "h01", no: "h03" },
+            q5: { text: "你总是充满正义感吗？", yes: "h02", no: "q9" },
+            q9: { text: "遇到困难你会先自己解决吗？", yes: "h04", no: "h03" },
+
+            // 分支二：不喜欢自由 (q1-No)
+            q3: { text: "你更喜欢探求真相，即使那会让你牺牲很多东西？", yes: "q6", no: "q7" },
+            q6: { text: "你充满正义感吗？", yes: "h02", no: "q10" },
+            q10: { text: "你意志坚定吗？", yes: "h04", no: "h03" }, // h05是交叉点
+            q7: { text: "你做事严谨、有明确目标吗？", yes: "q11", no: "q12" },
+            q11: { text: "你喜欢科学吗？", yes: "h04", no: "h02" },
+            q12: { text: "你有很强的包容心吗？", yes: "q13", no: "h01" },
+            q13: { text: "你对神秘学有很高的接受度吗？", yes: "h03", no: "h01" }
+        };
+
+        // 结果文案配置
+        const results = {
+            h01: {
+                title: "h01 绞索收紧日",
+                role: "自由的囚徒",
+                desc: "你有着可以去做几乎任何事的自由。怨是悬挂在房梁上又垂下的绳索，无论你如何移动，催命的环永远沉默地停在那里，等你亲自去看探过它后的世界。"
+            },
+            h02: {
+                title: "h02 霉斑蔓延时",
+                role: "正义的殉道者",
+                desc: "你有着作为警察的正义感。爱是一场声势浩荡的瘟疫，它如同某种生着根的霉菌，扎根在人的身上微不足道的某处，而后爬满全身，最后溃烂。"
+            },
+            h03: {
+                title: "h03 浓彩狂欢节",
+                role: "急诊科的疯子",
+                desc: "你有着作为急诊医生的耐力。你看见了恨，它热烈、张扬，用最浓烈的色彩浇灌自己的派对，于是某刻到来时，你也看见颜料泼墨般带着浪卷来。"
+            },
+            h04: {
+                title: "h04 刀刃下坠刻",
+                role: "孤高的解剖刀",
+                desc: "你有着作为生物学学者的知识。悔是最残忍的凌迟秀，一把又一把生锈的钝刀劈砍在你的身上，可它实在太钝，以至于只能反复地磨，却又切不断。"
+            },
+            // 因你未提供 h05 和 h06 的文案，我这里做了美观的占位符，你可以后续填入
+            h05: {
+                title: "h05 寂静深渊",
+                role: "迷途的旅人",
+                desc: "（检测到未知的命运分支... 你的情感细腻而复杂，如同深渊中微弱的火光。请补充此处的命运文本。）"
+            },
+            h06: {
+                title: "h06 钢铁意志",
+                role: "真相的猎手",
+                desc: "（检测到极致的坚定... 即使世界崩塌，你依然站在废墟之上。请补充此处的命运文本。）"
+            }
+        };
+
+        // --- 逻辑控制 ---
+        let currentStep = 'q1';
+
+        function startTest() {
+            switchScreen('start-screen', 'quiz-screen');
+            loadQuestion('q1');
+        }
+
+        function switchScreen(hideId, showId) {
+            document.getElementById(hideId).classList.remove('active');
+            setTimeout(() => {
+                document.getElementById(showId).classList.add('active');
+            }, 300); // 配合CSS的transition时间
+        }
+
+        function loadQuestion(id) {
+            const q = questions[id];
+            const qText = document.getElementById('question-text');
+            const optContainer = document.getElementById('options-container');
+            const progress = document.getElementById('progress');
+            
+            // 简单的进度条模拟
+            let randomProgress = Math.random() * 10 + 20; 
+            progress.style.width = (progress.offsetWidth + randomProgress) + 'px';
+
+            // 动画切换文字
+            qText.style.opacity = 0;
+            optContainer.innerHTML = ''; // 清空旧选项
+            
+            setTimeout(() => {
+                qText.innerText = q.text;
+                qText.style.opacity = 1;
+
+                // 创建按钮
+                createButton("是", () => handleAnswer(q.yes));
+                createButton("否", () => handleAnswer(q.no));
+            }, 300);
+        }
+
+        function createButton(text, onClick) {
+            const btn = document.createElement('button');
+            btn.className = 'btn option-btn fade-up';
+            btn.innerText = text;
+            btn.onclick = onClick;
+            document.getElementById('options-container').appendChild(btn);
+        }
+
+        function handleAnswer(nextId) {
+            if (nextId.startsWith('h')) {
+                showResult(nextId);
+            } else {
+                loadQuestion(nextId);
+            }
+        }
+
+        function showResult(id) {
+            const data = results[id];
+            document.getElementById('result-title').innerText = data.title;
+            document.getElementById('result-role').innerText = data.role;
+            document.getElementById('result-desc').innerText = data.desc;
+            
+            switchScreen('quiz-screen', 'result-screen');
+        }
+
+        function restartTest() {
+            switchScreen('result-screen', 'start-screen');
+            document.getElementById('progress').style.width = '5%';
+            // 重置状态
+            setTimeout(() => {
+                currentStep = 'q1';
+            }, 500);
+        }
+    </script>
+</body>
+</html>
